@@ -219,6 +219,25 @@ body{
 .answer.correct{border-color:var(--green);background:var(--green-bg)}
 .answer.wrong{border-color:var(--red);background:var(--red-bg)}
 
+/* 送出答案按鈕（手機沒有 Enter 鍵時使用） */
+.submit-btn{
+  width:100%;
+  margin-top:14px;
+  border:none;
+  background:var(--brand);
+  color:#fff;
+  font-size:1.15rem;
+  font-weight:700;
+  padding:16px;
+  border-radius:14px;
+  cursor:pointer;
+  font-family:inherit;
+  box-shadow:0 5px 14px rgba(76,125,255,.3);
+  transition:transform .1s ease,background .15s ease;
+}
+.submit-btn:hover{background:var(--brand-deep)}
+.submit-btn:active{transform:scale(.98)}
+
 .hint{
   text-align:center;
   color:var(--ink-soft);
@@ -429,7 +448,8 @@ body{
       <div class="equation" id="equation">— —</div>
       <input class="answer" id="answerInput" type="text" inputmode="numeric"
              autocomplete="off" placeholder="?">
-      <div class="hint" id="hint">輸入答案後按 Enter</div>
+      <button class="submit-btn" id="submitBtn" type="button">送出答案</button>
+      <div class="hint" id="hint">輸入答案後按「送出答案」（電腦可直接按 Enter）</div>
       <!-- 中途離開：小小的、低調的按鈕，不干擾練習 -->
       <button class="exit-link" id="exitBtn">離開練習</button>
     </div>
@@ -671,6 +691,7 @@ function startSession(questionPool){
     startTime: 0,                // 本題開始時間
     sessionStart: Date.now(),
     timerId: null,
+    locked: false,   // 作答鎖：避免在切題的短暫空檔重複送出
   };
 
   showScreen('screen-train');
@@ -704,7 +725,7 @@ function nextQuestion(){
   el.bar.style.width = ((session.index)/session.count*100) + '%';
   el.combo.textContent = session.combo;
 
-  el.input.disabled = false;
+  session.locked = false;
   el.input.focus();   // 自動聚焦
 
   // 開始本題計時
@@ -723,7 +744,7 @@ function startTimer(){
 
 // 處理一次作答（Enter 觸發）
 function submitAnswer(){
-  if(!session || el.input.disabled) return;
+  if(!session || session.locked) return;
   const raw = el.input.value.trim();
   if(raw==='') return;                 // 空白不處理
   const val = Number(raw);
@@ -736,7 +757,7 @@ function submitAnswer(){
   if(val === q.answer){
     // ===== 答對 =====
     clearInterval(session.timerId);
-    el.input.disabled = true;
+    session.locked = true;
     el.input.classList.add('correct');
 
     const slow = elapsed > HESITATION_MS;     // 是否卡頓
@@ -781,7 +802,7 @@ function submitAnswer(){
     }else{
       // 第二次仍錯：公布答案、移到下一題
       clearInterval(session.timerId);
-      el.input.disabled = true;
+      session.locked = true;
       el.hint.innerHTML = `正確答案是 <span class="reveal">${q.answer}</span>`;
       session.results.push({
         text:q.text, answer:q.answer, given:val,
@@ -797,6 +818,12 @@ function submitAnswer(){
 el.input.addEventListener('keydown', e=>{
   if(e.key==='Enter') submitAnswer();
 });
+
+// 手機沒有 Enter 鍵：用「送出答案」按鈕送出
+const submitBtn = document.getElementById('submitBtn');
+// 按下時 preventDefault，避免按鈕搶走輸入框焦點 → 手機鍵盤就不會收起來
+submitBtn.addEventListener('pointerdown', e=>e.preventDefault());
+submitBtn.addEventListener('click', ()=> submitAnswer());
 
 // 中途「離開練習」：先確認，避免誤觸；不會儲存這場未完成的紀錄
 document.getElementById('exitBtn').addEventListener('click', ()=>{

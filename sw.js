@@ -1,7 +1,9 @@
-/* 口算能量訓練器 — Service Worker
-   作用：第一次開啟後把 App 快取在裝置裡，之後沒網路也能玩。
-   改版時把 CACHE 的版本號（v1→v2…）加一，使用者就會自動拿到新版。 */
-const CACHE = 'mpt-v1';
+/* 口算能量訓練器 — Service Worker（v2）
+   作用：第一次有網路時把 App 存進裝置，之後沒網路也能玩。
+   策略：有網路時優先抓最新版（所以你更新後一打開就是新版），
+        沒網路時才用先前存好的版本。
+   改版時把 CACHE 版本號（v2→v3…）加一即可。 */
+const CACHE = 'mpt-v2';
 const ASSETS = [
   './', './index.html', './manifest.webmanifest',
   './icon-180.png', './icon-192.png', './icon-512.png', './icon.svg'
@@ -18,17 +20,29 @@ self.addEventListener('activate', e => {
   );
 });
 
-// 先用快取（離線可開），有網路時順便更新；都失敗就回首頁
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
-  e.respondWith(
-    caches.match(e.request).then(cached => {
-      const network = fetch(e.request).then(resp => {
+  const req = e.request;
+  const isPage = req.mode === 'navigate' ||
+                 (req.headers.get('accept') || '').includes('text/html');
+
+  if (isPage) {
+    // 網頁本身：先抓網路（拿最新版），失敗才用快取（離線可開）
+    e.respondWith(
+      fetch(req).then(resp => {
         const copy = resp.clone();
-        caches.open(CACHE).then(c => c.put(e.request, copy));
+        caches.open(CACHE).then(c => c.put('./index.html', copy));
         return resp;
-      }).catch(() => cached || caches.match('./index.html'));
-      return cached || network;
-    })
-  );
+      }).catch(() => caches.match('./index.html'))
+    );
+  } else {
+    // 圖示等資源：先用快取（快），順便在背景更新
+    e.respondWith(
+      caches.match(req).then(cached => cached || fetch(req).then(resp => {
+        const copy = resp.clone();
+        caches.open(CACHE).then(c => c.put(req, copy));
+        return resp;
+      }))
+    );
+  }
 });
