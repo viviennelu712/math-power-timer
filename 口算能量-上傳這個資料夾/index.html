@@ -1,0 +1,962 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Math Power Timer｜口算能量訓練器</title>
+<style>
+/* ===================================================================
+   設計變數：顏色、字體、圓角等集中管理，方便日後調整風格
+   =================================================================== */
+:root{
+  --bg:#f4f7fb;            /* 頁面背景（淺色、不刺眼） */
+  --card:#ffffff;         /* 卡片背景 */
+  --ink:#2b3445;          /* 主要文字 */
+  --ink-soft:#6b7689;     /* 次要文字 */
+  --line:#e3e9f2;         /* 邊框線 */
+  --brand:#4c7dff;        /* 主色（任務藍） */
+  --brand-deep:#3563e0;
+  --green:#2bbf8a;        /* 正確 */
+  --green-bg:#e6f8f1;
+  --red:#ff6b6b;          /* 錯誤（溫和） */
+  --red-bg:#fff0f0;
+  --amber:#f5a623;        /* 慢題/能量 */
+  --radius:18px;
+  --shadow:0 8px 24px rgba(43,52,69,.08);
+  --font:'Segoe UI','PingFang TC','Microsoft JhengHei',system-ui,sans-serif;
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  font-family:var(--font);
+  background:var(--bg);
+  color:var(--ink);
+  -webkit-font-smoothing:antialiased;
+  display:flex;
+  justify-content:center;
+  padding:16px;
+}
+
+/* 容器：手機到桌機都能用的最大寬度 */
+.app{
+  width:100%;
+  max-width:560px;
+  display:flex;
+  flex-direction:column;
+  gap:16px;
+}
+
+/* 標題列 */
+.brand{
+  text-align:center;
+  padding-top:8px;
+}
+.brand h1{
+  font-size:1.4rem;
+  letter-spacing:.5px;
+}
+.brand .en{
+  font-size:.72rem;
+  color:var(--ink-soft);
+  letter-spacing:2px;
+  text-transform:uppercase;
+}
+
+/* 卡片 */
+.card{
+  background:var(--card);
+  border-radius:var(--radius);
+  box-shadow:var(--shadow);
+  padding:22px;
+}
+
+/* 區塊標題 */
+.section-title{
+  font-size:.95rem;
+  color:var(--ink-soft);
+  margin-bottom:10px;
+  font-weight:600;
+}
+
+/* 選項按鈕群組 */
+.options{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(96px,1fr));
+  gap:10px;
+  margin-bottom:20px;
+}
+.opt{
+  border:2px solid var(--line);
+  background:#fff;
+  color:var(--ink);
+  border-radius:14px;
+  padding:12px 8px;
+  font-size:.95rem;
+  cursor:pointer;
+  transition:all .15s ease;
+  font-family:inherit;
+  text-align:center;
+}
+.opt:hover{border-color:var(--brand)}
+.opt.active{
+  border-color:var(--brand);
+  background:var(--brand);
+  color:#fff;
+  box-shadow:0 4px 12px rgba(76,125,255,.3);
+}
+.opt small{display:block;font-size:.7rem;opacity:.8;margin-top:2px}
+
+/* 大按鈕 */
+.btn-primary{
+  width:100%;
+  border:none;
+  background:var(--brand);
+  color:#fff;
+  font-size:1.25rem;
+  font-weight:700;
+  padding:18px;
+  border-radius:16px;
+  cursor:pointer;
+  font-family:inherit;
+  box-shadow:0 6px 16px rgba(76,125,255,.35);
+  transition:transform .1s ease,background .15s ease;
+}
+.btn-primary:hover{background:var(--brand-deep)}
+.btn-primary:active{transform:scale(.98)}
+
+.btn-row{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  margin-top:16px;
+}
+.btn{
+  border:2px solid var(--line);
+  background:#fff;
+  color:var(--ink);
+  padding:14px;
+  border-radius:14px;
+  font-size:1rem;
+  font-weight:600;
+  cursor:pointer;
+  font-family:inherit;
+  transition:all .15s ease;
+}
+.btn:hover{border-color:var(--brand);color:var(--brand)}
+.btn.full{grid-column:1 / -1}
+
+/* ===== 訓練畫面 ===== */
+.train-top{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:10px;
+  margin-bottom:8px;
+}
+.pill{
+  background:var(--bg);
+  border-radius:999px;
+  padding:8px 14px;
+  font-size:.9rem;
+  font-weight:600;
+  color:var(--ink-soft);
+  white-space:nowrap;
+}
+.pill b{color:var(--ink)}
+.pill.combo{color:var(--amber)}
+
+/* 進度條 */
+.progress{
+  height:8px;
+  background:var(--line);
+  border-radius:999px;
+  overflow:hidden;
+  margin-bottom:28px;
+}
+.progress > i{
+  display:block;
+  height:100%;
+  width:0;
+  background:var(--brand);
+  border-radius:999px;
+  transition:width .3s ease;
+}
+
+/* 大算式 */
+.equation{
+  text-align:center;
+  font-size:3rem;
+  font-weight:700;
+  letter-spacing:2px;
+  margin:18px 0 24px;
+  min-height:64px;
+}
+
+/* 答案輸入 */
+.answer{
+  width:100%;
+  text-align:center;
+  font-size:2rem;
+  font-weight:700;
+  padding:16px;
+  border:3px solid var(--line);
+  border-radius:16px;
+  font-family:inherit;
+  outline:none;
+  transition:border-color .15s ease,background .15s ease;
+  color:var(--ink);
+}
+.answer:focus{border-color:var(--brand)}
+.answer.correct{border-color:var(--green);background:var(--green-bg)}
+.answer.wrong{border-color:var(--red);background:var(--red-bg)}
+
+.hint{
+  text-align:center;
+  color:var(--ink-soft);
+  font-size:.85rem;
+  margin-top:14px;
+  min-height:20px;
+}
+.reveal{color:var(--amber);font-weight:700}
+
+/* 成功時的綠色閃光 */
+.flash{
+  position:fixed;
+  inset:0;
+  background:var(--green);
+  opacity:0;
+  pointer-events:none;
+  z-index:50;
+}
+.flash.show{animation:flash .4s ease}
+@keyframes flash{
+  0%{opacity:0}
+  30%{opacity:.18}
+  100%{opacity:0}
+}
+
+/* Combo 浮動字 */
+.combo-pop{
+  position:fixed;
+  top:50%;left:50%;
+  transform:translate(-50%,-50%);
+  font-size:2.4rem;
+  font-weight:800;
+  color:var(--amber);
+  opacity:0;
+  pointer-events:none;
+  z-index:60;
+  text-shadow:0 2px 8px rgba(0,0,0,.1);
+}
+.combo-pop.show{animation:pop .7s ease}
+@keyframes pop{
+  0%{opacity:0;transform:translate(-50%,-30%) scale(.6)}
+  30%{opacity:1;transform:translate(-50%,-60%) scale(1.1)}
+  100%{opacity:0;transform:translate(-50%,-90%) scale(1)}
+}
+
+/* ===== 報告畫面 ===== */
+.mission-clear{
+  text-align:center;
+  margin-bottom:6px;
+}
+.mission-clear .big{
+  font-size:1.6rem;
+  font-weight:800;
+  color:var(--brand);
+}
+.stats{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  margin:18px 0;
+}
+.stat{
+  background:var(--bg);
+  border-radius:14px;
+  padding:14px;
+  text-align:center;
+}
+.stat .num{font-size:1.5rem;font-weight:800}
+.stat .lab{font-size:.78rem;color:var(--ink-soft);margin-top:2px}
+.stat.energy .num{color:var(--amber)}
+
+.list{margin-top:8px}
+.list h4{
+  font-size:.95rem;
+  margin:16px 0 8px;
+  display:flex;align-items:center;gap:6px;
+}
+.q-item{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  background:var(--bg);
+  border-radius:10px;
+  padding:10px 14px;
+  margin-bottom:6px;
+  font-size:.95rem;
+}
+.q-item .eq{font-weight:700}
+.q-item .meta{font-size:.82rem;color:var(--ink-soft)}
+.q-item .meta .x{color:var(--red);font-weight:700}
+.q-item .meta .ok{color:var(--green);font-weight:700}
+.q-item .meta .slow{color:var(--amber);font-weight:700}
+.empty{color:var(--ink-soft);font-size:.88rem;padding:6px 2px}
+
+/* ===== 首頁紀錄區 ===== */
+.record-card{
+  background:linear-gradient(135deg,#eef3ff,#f7faff);
+  border:1px solid var(--line);
+}
+.record-row{
+  display:flex;
+  justify-content:space-between;
+  padding:8px 0;
+  font-size:.9rem;
+  border-bottom:1px dashed var(--line);
+}
+.record-row:last-child{border-bottom:none}
+.record-row b{color:var(--ink)}
+.record-row span{color:var(--ink-soft)}
+
+/* 中途離開：低調的文字按鈕 */
+.exit-link{
+  display:block;
+  margin:18px auto 0;
+  background:none;
+  border:none;
+  color:var(--ink-soft);
+  font-size:.82rem;
+  font-family:inherit;
+  cursor:pointer;
+  padding:4px 8px;
+  opacity:.65;
+  transition:opacity .15s ease,color .15s ease;
+}
+.exit-link:hover{opacity:1;color:var(--red)}
+
+/* 工具：顯示/隱藏畫面 */
+.screen{display:none}
+.screen.active{display:block}
+
+/* 小螢幕微調 */
+@media(max-width:420px){
+  .equation{font-size:2.4rem}
+  .stats{grid-template-columns:1fr 1fr}
+}
+</style>
+</head>
+<body>
+
+<!-- 綠色成功閃光 / Combo 浮字（全畫面覆蓋層） -->
+<div class="flash" id="flash"></div>
+<div class="combo-pop" id="comboPop"></div>
+
+<div class="app">
+
+  <div class="brand">
+    <div class="en">Math Power Timer</div>
+    <h1>口算能量訓練器</h1>
+  </div>
+
+  <!-- ============================================================
+       畫面 1：首頁 / 設定
+       ============================================================ -->
+  <section class="screen active" id="screen-home">
+
+    <div class="card">
+      <div class="section-title">練習模式</div>
+      <div class="options" id="modeOptions">
+        <button class="opt" data-mode="add">加法</button>
+        <button class="opt" data-mode="sub">減法</button>
+        <button class="opt" data-mode="mul">乘法</button>
+        <button class="opt" data-mode="div">除法</button>
+        <button class="opt" data-mode="mix">混合</button>
+      </div>
+
+      <div class="section-title">難度等級</div>
+      <div class="options" id="levelOptions">
+        <button class="opt" data-level="1">L1<small>20以內加減</small></button>
+        <button class="opt" data-level="2">L2<small>100以內不進借位</small></button>
+        <button class="opt" data-level="3">L3<small>100以內進借位</small></button>
+        <button class="opt" data-level="4">L4<small>九九乘法</small></button>
+        <button class="opt" data-level="5">L5<small>表內除法</small></button>
+        <button class="opt" data-level="6">L6<small>兩位×一位</small></button>
+      </div>
+
+      <div class="section-title">題目數量</div>
+      <div class="options" id="countOptions">
+        <button class="opt" data-count="10">10 題</button>
+        <button class="opt" data-count="20">20 題</button>
+        <button class="opt" data-count="30">30 題</button>
+      </div>
+
+      <button class="btn-primary" id="startBtn">開始任務 🚀</button>
+    </div>
+
+    <!-- 家長友善紀錄區 -->
+    <div class="card record-card" id="recordCard">
+      <div class="section-title">📈 練習紀錄</div>
+      <div id="recordBody">
+        <div class="empty">還沒有紀錄，完成第一次任務後就會出現囉！</div>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- ============================================================
+       畫面 2：訓練中
+       ============================================================ -->
+  <section class="screen" id="screen-train">
+    <div class="card">
+      <div class="train-top">
+        <span class="pill"><b id="progText">0 / 10</b></span>
+        <span class="pill">⏱ <b id="timerText">0.0s</b></span>
+        <span class="pill combo" id="comboPill">🔥 <b id="comboText">0</b></span>
+      </div>
+      <div class="progress"><i id="progBar"></i></div>
+
+      <div class="equation" id="equation">— —</div>
+      <input class="answer" id="answerInput" type="text" inputmode="numeric"
+             autocomplete="off" placeholder="?">
+      <div class="hint" id="hint">輸入答案後按 Enter</div>
+      <!-- 中途離開：小小的、低調的按鈕，不干擾練習 -->
+      <button class="exit-link" id="exitBtn">離開練習</button>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       畫面 3：報告
+       ============================================================ -->
+  <section class="screen" id="screen-report">
+    <div class="card">
+      <div class="mission-clear">
+        <div class="big">🎉 Mission Clear！</div>
+      </div>
+
+      <div class="stats">
+        <div class="stat"><div class="num" id="rTotal">0</div><div class="lab">總題數</div></div>
+        <div class="stat"><div class="num" id="rCorrect">0</div><div class="lab">答對</div></div>
+        <div class="stat"><div class="num" id="rAcc">0%</div><div class="lab">正確率</div></div>
+        <div class="stat"><div class="num" id="rTime">0s</div><div class="lab">總時間</div></div>
+        <div class="stat"><div class="num" id="rAvg">0s</div><div class="lab">平均每題</div></div>
+        <div class="stat"><div class="num" id="rCombo">0</div><div class="lab">最高 Combo</div></div>
+        <div class="stat energy"><div class="num" id="rEnergy">0</div><div class="lab">獲得能量 ⚡</div></div>
+        <div class="stat"><div class="num" id="rSlow">0</div><div class="lab">卡頓題</div></div>
+      </div>
+
+      <div class="list">
+        <h4>❌ 錯題</h4>
+        <div id="wrongList"></div>
+
+        <h4>🐢 慢題 / 卡頓題（超過 4 秒）</h4>
+        <div id="slowList"></div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn" id="retryWrong">重練錯題</button>
+        <button class="btn" id="retrySlow">重練慢題</button>
+        <button class="btn full" id="playAgain">再玩一次</button>
+      </div>
+      <!-- 明顯的「回主畫面」獨立大按鈕，方便重新選模式 -->
+      <button class="btn-primary" id="goHome" style="margin-top:12px">🏠 回主畫面</button>
+    </div>
+  </section>
+
+</div>
+
+<script>
+/* ===================================================================
+   口算能量訓練器 — 主程式
+   結構：
+     1. 設定狀態 (state) 與常數
+     2. 題目產生器 (Question Generators)
+     3. 畫面切換工具
+     4. 首頁設定邏輯
+     5. 訓練流程 (出題、計時、判分、Combo)
+     6. 報告畫面
+     7. localStorage 紀錄
+   =================================================================== */
+
+/* ---------- 1. 常數與狀態 ---------- */
+const HESITATION_MS = 4000;   // 超過 4 秒視為「卡頓題」
+const POINTS_BASE   = 10;     // 答對基本能量
+const STORAGE_KEY   = 'mathPowerTimer.records';
+
+// 中文標籤，給報告與紀錄使用
+const MODE_LABEL  = {add:'加法',sub:'減法',mul:'乘法',div:'除法',mix:'混合'};
+const LEVEL_LABEL = {1:'20以內加減',2:'100以內不進借位',3:'100以內進借位',
+                     4:'九九乘法',5:'表內除法',6:'兩位×一位'};
+
+// 目前選擇（含預設值）
+const setup = { mode:'add', level:1, count:10 };
+
+// 一場訓練的執行狀態
+let session = null;
+
+/* ---------- 2. 題目產生器 ---------- */
+// 工具：產生 min~max（含）之間的整數
+function rand(min,max){ return Math.floor(Math.random()*(max-min+1))+min; }
+
+// 依「等級」決定加減法的數字範圍與性質
+// 回傳 {text, answer}
+function genAddSub(level, forceOp){
+  // forceOp: 'add' / 'sub' / null(隨機)
+  let a,b,op,answer;
+
+  if(level===1){
+    // 20 以內加減，答案介於 0~20
+    op = forceOp || (Math.random()<.5?'add':'sub');
+    if(op==='add'){
+      a = rand(0,20);
+      b = rand(0,20-a);           // 確保和 ≤ 20
+      answer = a+b;
+    }else{
+      a = rand(0,20);
+      b = rand(0,a);              // 確保差 ≥ 0
+      answer = a-b;
+    }
+  }
+  else if(level===2){
+    // 100 以內、不進位/不借位
+    op = forceOp || (Math.random()<.5?'add':'sub');
+    if(op==='add'){
+      // 個位相加 <10、十位相加 <10
+      const a1=rand(1,8), a0=rand(0,8);
+      const b1=rand(1,9-a1), b0=rand(0,9-a0);
+      a=a1*10+a0; b=b1*10+b0; answer=a+b;
+    }else{
+      // 被減數每位都 ≥ 減數，避免借位
+      const a1=rand(2,9), a0=rand(1,9);
+      const b1=rand(1,a1), b0=rand(0,a0);
+      a=a1*10+a0; b=b1*10+b0; answer=a-b;
+    }
+  }
+  else{
+    // level 3：100 以內、需要進位/借位
+    op = forceOp || (Math.random()<.5?'add':'sub');
+    if(op==='add'){
+      // 反覆產生直到個位相加 ≥10（進位）且總和 ≤100
+      do{
+        a=rand(10,89); b=rand(10,89);
+      }while((a%10)+(b%10)<10 || a+b>100);
+      answer=a+b;
+    }else{
+      // 反覆產生直到個位需要借位
+      do{
+        a=rand(20,99); b=rand(10,a-1);
+      }while((a%10)>=(b%10));   // 個位不夠減 → 需要借位
+      answer=a-b;
+    }
+  }
+  const sign = op==='add'?'+':'−';
+  return { text:`${a} ${sign} ${b}`, answer };
+}
+
+// 九九乘法 2~9 × 2~9
+function genMul(){
+  const a=rand(2,9), b=rand(2,9);
+  return { text:`${a} × ${b}`, answer:a*b };
+}
+
+// 表內除法：由乘法事實反推
+function genDiv(){
+  const a=rand(2,9), b=rand(2,9);
+  const product=a*b;
+  // 除以 a 或 除以 b 隨機
+  const divisor = Math.random()<.5?a:b;
+  return { text:`${product} ÷ ${divisor}`, answer:product/divisor };
+}
+
+// 兩位數 × 一位數，乘積 < 500
+function genMul2x1(){
+  let a,b,answer;
+  do{
+    a=rand(11,99);   // 兩位數
+    b=rand(2,9);     // 一位數
+    answer=a*b;
+  }while(answer>=500);
+  return { text:`${a} × ${b}`, answer };
+}
+
+// 依 setup 產生「一題」
+function makeQuestion(mode, level){
+  // 混合模式：隨機挑一種運算，沿用目前難度概念
+  if(mode==='mix'){
+    const pick = ['add','sub','mul','div'][rand(0,3)];
+    return makeQuestion(pick, level);
+  }
+  if(mode==='add') return genAddSub(level==1||level==2||level==3?level:3,'add');
+  if(mode==='sub') return genAddSub(level==1||level==2||level==3?level:3,'sub');
+  if(mode==='mul') return level==6 ? genMul2x1() : genMul();
+  if(mode==='div') return genDiv();
+  // 保底
+  return genAddSub(1);
+}
+
+/* ---------- 3. 畫面切換 ---------- */
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  window.scrollTo(0,0);
+}
+
+/* ---------- 4. 首頁設定邏輯 ---------- */
+// 通用：在一組選項中設定 active，並更新 setup
+function bindOptionGroup(containerId, attr, key, cast){
+  const group = document.getElementById(containerId);
+  group.addEventListener('click', e=>{
+    const btn = e.target.closest('.opt');
+    if(!btn) return;
+    group.querySelectorAll('.opt').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    setup[key] = cast ? cast(btn.dataset[attr]) : btn.dataset[attr];
+  });
+}
+bindOptionGroup('modeOptions','mode','mode');
+bindOptionGroup('levelOptions','level','level',Number);
+bindOptionGroup('countOptions','count','count',Number);
+
+// 設定預設選取狀態（加法 / L1 / 10題）
+function applyDefaultSelection(){
+  document.querySelector('#modeOptions .opt[data-mode="add"]').classList.add('active');
+  document.querySelector('#levelOptions .opt[data-level="1"]').classList.add('active');
+  document.querySelector('#countOptions .opt[data-count="10"]').classList.add('active');
+}
+applyDefaultSelection();
+
+document.getElementById('startBtn').addEventListener('click', ()=>{
+  startSession();
+});
+
+/* ---------- 5. 訓練流程 ---------- */
+const el = {
+  prog:   document.getElementById('progText'),
+  bar:    document.getElementById('progBar'),
+  timer:  document.getElementById('timerText'),
+  combo:  document.getElementById('comboText'),
+  eq:     document.getElementById('equation'),
+  input:  document.getElementById('answerInput'),
+  hint:   document.getElementById('hint'),
+  flash:  document.getElementById('flash'),
+  pop:    document.getElementById('comboPop'),
+};
+
+// 開始一場新訓練。questionPool 可傳入指定題目（用於重練錯題/慢題）
+function startSession(questionPool){
+  const total = questionPool ? questionPool.length : setup.count;
+
+  session = {
+    mode: setup.mode,
+    level: setup.level,
+    count: total,
+    pool: questionPool || null,  // 若有預設題庫就用它
+    index: 0,
+    correct: 0,
+    energy: 0,
+    combo: 0,
+    bestCombo: 0,
+    attempts: 0,                 // 本題已嘗試次數
+    results: [],                 // 每題結果記錄
+    startTime: 0,                // 本題開始時間
+    sessionStart: Date.now(),
+    timerId: null,
+  };
+
+  showScreen('screen-train');
+  nextQuestion();
+}
+
+// 顯示下一題
+function nextQuestion(){
+  // 全部做完 → 報告
+  if(session.index >= session.count){
+    finishSession();
+    return;
+  }
+
+  // 取得題目：從題庫或即時產生
+  let q;
+  if(session.pool){
+    q = session.pool[session.index];
+  }else{
+    q = makeQuestion(session.mode, session.level);
+  }
+  session.current = q;
+  session.attempts = 0;
+
+  // 更新介面
+  el.eq.textContent = q.text + ' = ?';
+  el.input.value = '';
+  el.input.className = 'answer';
+  el.hint.textContent = '輸入答案後按 Enter';
+  el.prog.textContent = `${session.index+1} / ${session.count}`;
+  el.bar.style.width = ((session.index)/session.count*100) + '%';
+  el.combo.textContent = session.combo;
+
+  el.input.disabled = false;
+  el.input.focus();   // 自動聚焦
+
+  // 開始本題計時
+  session.startTime = Date.now();
+  startTimer();
+}
+
+// 即時計時器（顯示用）
+function startTimer(){
+  clearInterval(session.timerId);
+  session.timerId = setInterval(()=>{
+    const s = (Date.now()-session.startTime)/1000;
+    el.timer.textContent = s.toFixed(1)+'s';
+  },100);
+}
+
+// 處理一次作答（Enter 觸發）
+function submitAnswer(){
+  if(!session || el.input.disabled) return;
+  const raw = el.input.value.trim();
+  if(raw==='') return;                 // 空白不處理
+  const val = Number(raw);
+  if(Number.isNaN(val)) return;
+
+  const elapsed = Date.now() - session.startTime;
+  const q = session.current;
+  session.attempts++;
+
+  if(val === q.answer){
+    // ===== 答對 =====
+    clearInterval(session.timerId);
+    el.input.disabled = true;
+    el.input.classList.add('correct');
+
+    const slow = elapsed > HESITATION_MS;     // 是否卡頓
+    session.correct++;
+    session.combo++;
+    session.bestCombo = Math.max(session.bestCombo, session.combo);
+
+    // 能量：基本分 + Combo 加成；卡頓略減但仍鼓勵
+    const gain = POINTS_BASE + Math.min(session.combo,5)*2;
+    session.energy += gain;
+
+    // 記錄結果
+    session.results.push({
+      text:q.text, answer:q.answer, given:val,
+      correct:true, ms:elapsed, slow, firstTry:(session.attempts===1)
+    });
+
+    // 視覺回饋
+    flashSuccess();
+    el.combo.textContent = session.combo;
+    if(session.combo>=2) showCombo(session.combo);
+    el.hint.innerHTML = `<span style="color:var(--green);font-weight:700">能量 +${gain} ⚡</span>`;
+
+    // 短暫延遲後下一題
+    session.index++;
+    setTimeout(nextQuestion, 450);
+
+  }else{
+    // ===== 答錯 =====
+    session.combo = 0;                      // Combo 歸零
+    el.combo.textContent = 0;
+    el.input.classList.remove('correct');
+    el.input.classList.add('wrong');
+
+    if(session.attempts < 2){
+      // 第一次錯：溫和提示再試一次
+      el.hint.textContent = '再試一次看看 🙂';
+      el.input.value = '';
+      el.input.focus();
+      // 移除紅框抖動感（短暫後恢復可輸入樣式）
+      setTimeout(()=>el.input.classList.remove('wrong'),600);
+    }else{
+      // 第二次仍錯：公布答案、移到下一題
+      clearInterval(session.timerId);
+      el.input.disabled = true;
+      el.hint.innerHTML = `正確答案是 <span class="reveal">${q.answer}</span>`;
+      session.results.push({
+        text:q.text, answer:q.answer, given:val,
+        correct:false, ms:elapsed, slow:(elapsed>HESITATION_MS), firstTry:false
+      });
+      session.index++;
+      setTimeout(nextQuestion, 1100);
+    }
+  }
+}
+
+// Enter 送出
+el.input.addEventListener('keydown', e=>{
+  if(e.key==='Enter') submitAnswer();
+});
+
+// 中途「離開練習」：先確認，避免誤觸；不會儲存這場未完成的紀錄
+document.getElementById('exitBtn').addEventListener('click', ()=>{
+  if(confirm('要離開這次練習嗎？目前進度不會保存喔。')){
+    exitToHome();
+  }
+});
+
+// 綠色成功閃光
+function flashSuccess(){
+  el.flash.classList.remove('show');
+  void el.flash.offsetWidth;   // 強制 reflow 以重播動畫
+  el.flash.classList.add('show');
+}
+// Combo 浮字
+function showCombo(n){
+  el.pop.textContent = `Combo ×${n}!`;
+  el.pop.classList.remove('show');
+  void el.pop.offsetWidth;
+  el.pop.classList.add('show');
+}
+
+/* ---------- 6. 報告畫面 ---------- */
+function finishSession(){
+  clearInterval(session.timerId);
+  el.bar.style.width = '100%';
+
+  const totalMs = Date.now() - session.sessionStart;
+  const total   = session.count;
+  const correct = session.correct;
+  const acc     = total? Math.round(correct/total*100):0;
+  const totalSec= (totalMs/1000);
+  const avgSec  = total? (totalSec/total):0;
+
+  // 慢題：所有 slow=true 的（即使答對）
+  const slowItems  = session.results.filter(r=>r.slow);
+  const wrongItems = session.results.filter(r=>!r.correct);
+
+  // 填入摘要
+  document.getElementById('rTotal').textContent   = total;
+  document.getElementById('rCorrect').textContent = correct;
+  document.getElementById('rAcc').textContent     = acc+'%';
+  document.getElementById('rTime').textContent    = totalSec.toFixed(0)+'s';
+  document.getElementById('rAvg').textContent     = avgSec.toFixed(1)+'s';
+  document.getElementById('rCombo').textContent   = session.bestCombo;
+  document.getElementById('rEnergy').textContent  = session.energy;
+  document.getElementById('rSlow').textContent    = slowItems.length;
+
+  // 錯題列表
+  const wrongBox = document.getElementById('wrongList');
+  if(wrongItems.length===0){
+    wrongBox.innerHTML = '<div class="empty">太棒了，沒有錯題！🌟</div>';
+  }else{
+    wrongBox.innerHTML = wrongItems.map(r=>`
+      <div class="q-item">
+        <span class="eq">${r.text} = ${r.answer}</span>
+        <span class="meta">你的答案 <span class="x">${r.given}</span></span>
+      </div>`).join('');
+  }
+
+  // 慢題列表
+  const slowBox = document.getElementById('slowList');
+  if(slowItems.length===0){
+    slowBox.innerHTML = '<div class="empty">反應都很快，沒有卡頓題！⚡</div>';
+  }else{
+    slowBox.innerHTML = slowItems.map(r=>`
+      <div class="q-item">
+        <span class="eq">${r.text} = ${r.answer}</span>
+        <span class="meta">
+          ${r.correct?'<span class="ok">答對</span>':'<span class="x">答錯</span>'}
+          · <span class="slow">${(r.ms/1000).toFixed(1)}s</span>
+        </span>
+      </div>`).join('');
+  }
+
+  // 儲存本場紀錄
+  saveRecord({
+    date: new Date().toISOString(),
+    mode: session.mode,
+    level: session.level,
+    count: total,
+    accuracy: acc,
+    avgTime: Number(avgSec.toFixed(1)),
+    mistakes: wrongItems.length,
+    hesitations: slowItems.length,
+  });
+
+  showScreen('screen-report');
+}
+
+// 報告按鈕
+document.getElementById('playAgain').addEventListener('click', ()=> startSession());
+// 回主畫面：清空本次練習狀態（停掉計時器、清掉 session），但不動 localStorage 歷史紀錄
+function exitToHome(){
+  if(session){ clearInterval(session.timerId); }
+  session = null;
+  renderRecords();          // 重新讀取已保存的歷史紀錄並顯示
+  showScreen('screen-home'); // 回到首頁，題型/難度/題數可重新選擇
+}
+document.getElementById('goHome').addEventListener('click', exitToHome);
+document.getElementById('retryWrong').addEventListener('click', ()=>{
+  // 把錯題包成新題庫（沿用原算式）
+  const pool = session.results.filter(r=>!r.correct)
+                .map(r=>({text:r.text, answer:r.answer}));
+  if(pool.length===0){ alert('沒有錯題可以重練 🎉'); return; }
+  startSession(pool);
+});
+document.getElementById('retrySlow').addEventListener('click', ()=>{
+  const pool = session.results.filter(r=>r.slow)
+                .map(r=>({text:r.text, answer:r.answer}));
+  if(pool.length===0){ alert('沒有慢題可以重練 ⚡'); return; }
+  startSession(pool);
+});
+
+/* ---------- 7. localStorage 紀錄 ---------- */
+function loadRecords(){
+  try{ return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
+  catch(e){ return []; }
+}
+function saveRecord(rec){
+  const all = loadRecords();
+  all.push(rec);
+  // 只保留最近 100 筆，避免無限增長
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(all.slice(-100)));
+}
+
+// 首頁的家長友善紀錄區
+function renderRecords(){
+  const all = loadRecords();
+  const box = document.getElementById('recordBody');
+  if(all.length===0){
+    box.innerHTML = '<div class="empty">還沒有紀錄，完成第一次任務後就會出現囉！</div>';
+    return;
+  }
+
+  const last = all[all.length-1];
+  const recent = all.slice(-7);   // 近 7 次
+  const avgAcc = Math.round(recent.reduce((s,r)=>s+r.accuracy,0)/recent.length);
+  const avgSpd = (recent.reduce((s,r)=>s+r.avgTime,0)/recent.length).toFixed(1);
+
+  // 最常出現的「慢題類型」：用近 7 次中卡頓數加總，找出現最多的難度等級
+  const levelCount = {};
+  recent.forEach(r=>{
+    if(r.hesitations>0){
+      levelCount[r.level] = (levelCount[r.level]||0) + r.hesitations;
+    }
+  });
+  let slowType = '—';
+  const keys = Object.keys(levelCount);
+  if(keys.length){
+    const top = keys.sort((a,b)=>levelCount[b]-levelCount[a])[0];
+    slowType = LEVEL_LABEL[top] || '—';
+  }
+
+  const lastDate = new Date(last.date);
+  const dateStr = `${lastDate.getMonth()+1}/${lastDate.getDate()} ${String(lastDate.getHours()).padStart(2,'0')}:${String(lastDate.getMinutes()).padStart(2,'0')}`;
+
+  box.innerHTML = `
+    <div class="record-row"><span>最近一次練習</span>
+      <b>${dateStr}｜${MODE_LABEL[last.mode]}｜正確率 ${last.accuracy}%</b></div>
+    <div class="record-row"><span>近 7 次平均正確率</span><b>${avgAcc}%</b></div>
+    <div class="record-row"><span>近 7 次平均速度</span><b>${avgSpd}s / 題</b></div>
+    <div class="record-row"><span>最常出現的慢題類型</span><b>${slowType}</b></div>
+  `;
+}
+
+// 初始化首頁紀錄
+renderRecords();
+</script>
+</body>
+</html>
