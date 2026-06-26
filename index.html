@@ -3,6 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- PWA：加入主畫面 + 離線支援 -->
+<meta name="theme-color" content="#4c7dff">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="口算能量">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
 <title>Math Power Timer｜口算能量訓練器</title>
 <style>
 /* ===================================================================
@@ -957,6 +965,14 @@ function renderRecords(){
 
 // 初始化首頁紀錄
 renderRecords();
+</script>
+<script>
+/* 註冊 Service Worker：讓 App 可離線使用 */
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('sw.js').catch(()=>{});
+  });
+}
 </script>
 </body>
 </html>
