@@ -403,15 +403,9 @@ body{
         <button class="opt" data-mode="mix">混合</button>
       </div>
 
-      <div class="section-title">難度等級</div>
-      <div class="options" id="levelOptions">
-        <button class="opt" data-level="1">L1<small>20以內加減</small></button>
-        <button class="opt" data-level="2">L2<small>100以內不進借位</small></button>
-        <button class="opt" data-level="3">L3<small>100以內進借位</small></button>
-        <button class="opt" data-level="4">L4<small>九九乘法</small></button>
-        <button class="opt" data-level="5">L5<small>表內除法</small></button>
-        <button class="opt" data-level="6">L6<small>兩位×一位</small></button>
-      </div>
+      <div class="section-title">今天要練哪一關？</div>
+      <!-- 難度卡片依「練習模式」動態產生（見 JS renderLevelOptions） -->
+      <div class="options" id="levelOptions"></div>
 
       <div class="section-title">題目數量</div>
       <div class="options" id="countOptions">
@@ -515,11 +509,43 @@ const STORAGE_KEY   = 'mathPowerTimer.records';
 
 // 中文標籤，給報告與紀錄使用
 const MODE_LABEL  = {add:'加法',sub:'減法',mul:'乘法',div:'除法',mix:'混合'};
-const LEVEL_LABEL = {1:'20以內加減',2:'100以內不進借位',3:'100以內進借位',
-                     4:'九九乘法',5:'表內除法',6:'兩位×一位'};
+
+// 每個「練習模式」對應的難度關卡（id 用於題目產生與紀錄）
+// main = 卡片大字、sub = 卡片小字說明
+const MODE_LEVELS = {
+  add: [
+    {id:'add20',    main:'L1', sub:'20以內加法'},
+    {id:'add100nc', main:'L2', sub:'100以內不進位'},
+    {id:'add100c',  main:'L3', sub:'100以內進位'},
+  ],
+  sub: [
+    {id:'sub20',    main:'L1', sub:'20以內減法'},
+    {id:'sub100nb', main:'L2', sub:'100以內不退位'},
+    {id:'sub100b',  main:'L3', sub:'100以內退位'},
+  ],
+  mul: [
+    {id:'mul99',    main:'L1', sub:'九九乘法'},
+    {id:'mul2x1',   main:'L2', sub:'兩位數×一位數'},
+  ],
+  div: [
+    {id:'div99',    main:'L1', sub:'九九除法'},
+  ],
+  mix: [
+    {id:'mixM1', main:'M1', sub:'20以內加減混合'},
+    {id:'mixM2', main:'M2', sub:'100以內加減混合'},
+    {id:'mixM3', main:'M3', sub:'九九乘除混合'},
+    {id:'mixM4', main:'M4', sub:'加減乘除綜合'},
+  ],
+};
+
+// 攤平成 id → 顯示資訊，給紀錄/慢題類型使用
+const LEVEL_INFO = {};
+for(const m in MODE_LEVELS){
+  MODE_LEVELS[m].forEach(lv=>{ LEVEL_INFO[lv.id] = {mode:m, main:lv.main, sub:lv.sub, display:MODE_LABEL[m]+'·'+lv.sub}; });
+}
 
 // 目前選擇（含預設值）
-const setup = { mode:'add', level:1, count:10 };
+const setup = { mode:'add', levelId:'add20', count:10 };
 
 // 一場訓練的執行狀態
 let session = null;
@@ -609,19 +635,38 @@ function genMul2x1(){
   return { text:`${a} × ${b}`, answer };
 }
 
-// 依 setup 產生「一題」
-function makeQuestion(mode, level){
-  // 混合模式：隨機挑一種運算，沿用目前難度概念
-  if(mode==='mix'){
-    const pick = ['add','sub','mul','div'][rand(0,3)];
-    return makeQuestion(pick, level);
-  }
-  if(mode==='add') return genAddSub(level==1||level==2||level==3?level:3,'add');
-  if(mode==='sub') return genAddSub(level==1||level==2||level==3?level:3,'sub');
-  if(mode==='mul') return level==6 ? genMul2x1() : genMul();
-  if(mode==='div') return genDiv();
-  // 保底
-  return genAddSub(1);
+// 每個難度關卡 id → 對應的題目產生方式
+const GEN = {
+  // 加法
+  add20:    ()=>genAddSub(1,'add'),   // 20 以內加法
+  add100nc: ()=>genAddSub(2,'add'),   // 100 以內不進位
+  add100c:  ()=>genAddSub(3,'add'),   // 100 以內進位
+  // 減法
+  sub20:    ()=>genAddSub(1,'sub'),   // 20 以內減法
+  sub100nb: ()=>genAddSub(2,'sub'),   // 100 以內不退位
+  sub100b:  ()=>genAddSub(3,'sub'),   // 100 以內退位
+  // 乘法
+  mul99:    ()=>genMul(),             // 九九乘法
+  mul2x1:   ()=>genMul2x1(),          // 兩位數 × 一位數
+  // 除法
+  div99:    ()=>genDiv(),             // 表內（九九）除法
+  // 混合（混合專用分級）
+  mixM1: ()=>genAddSub(1),                          // 20 以內加減混合
+  mixM2: ()=>genAddSub(Math.random()<.5?2:3),       // 100 以內加減混合（含進退位）
+  mixM3: ()=>Math.random()<.5?genMul():genDiv(),    // 九九乘除混合
+  mixM4: ()=>{                                      // 加減乘除綜合挑戰
+    const r=Math.random();
+    if(r<.40) return genAddSub(Math.random()<.5?2:3); // 100 以內加減
+    if(r<.65) return genMul();                        // 九九乘法
+    if(r<.85) return genDiv();                        // 九九除法
+    return genMul2x1();                               // 簡單兩位數 × 一位數
+  },
+};
+
+// 依目前選到的難度關卡產生「一題」
+function makeQuestion(levelId){
+  const gen = GEN[levelId] || GEN.add20;   // 找不到就保底
+  return gen();
 }
 
 /* ---------- 3. 畫面切換 ---------- */
@@ -643,14 +688,41 @@ function bindOptionGroup(containerId, attr, key, cast){
     setup[key] = cast ? cast(btn.dataset[attr]) : btn.dataset[attr];
   });
 }
-bindOptionGroup('modeOptions','mode','mode');
-bindOptionGroup('levelOptions','level','level',Number);
 bindOptionGroup('countOptions','count','count',Number);
+
+// 依「練習模式」動態產生難度關卡卡片，並預設選中第一個可用難度
+function renderLevelOptions(mode){
+  const box  = document.getElementById('levelOptions');
+  const list = MODE_LEVELS[mode] || [];
+  box.innerHTML = list.map((lv,i)=>
+    `<button class="opt${i===0?' active':''}" data-level="${lv.id}">${lv.main}<small>${lv.sub}</small></button>`
+  ).join('');
+  setup.levelId = list.length ? list[0].id : null;
+}
+
+// 練習模式：點擊時更新 active，並切換難度卡片
+document.getElementById('modeOptions').addEventListener('click', e=>{
+  const btn = e.target.closest('.opt');
+  if(!btn) return;
+  document.querySelectorAll('#modeOptions .opt').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  setup.mode = btn.dataset.mode;
+  renderLevelOptions(setup.mode);   // 難度選項自動更新
+});
+
+// 難度關卡（卡片是動態產生的，用事件委派）
+document.getElementById('levelOptions').addEventListener('click', e=>{
+  const btn = e.target.closest('.opt');
+  if(!btn) return;
+  document.querySelectorAll('#levelOptions .opt').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  setup.levelId = btn.dataset.level;
+});
 
 // 設定預設選取狀態（加法 / L1 / 10題）
 function applyDefaultSelection(){
   document.querySelector('#modeOptions .opt[data-mode="add"]').classList.add('active');
-  document.querySelector('#levelOptions .opt[data-level="1"]').classList.add('active');
+  renderLevelOptions('add');   // 產生加法的難度卡片並選中第一關
   document.querySelector('#countOptions .opt[data-count="10"]').classList.add('active');
 }
 applyDefaultSelection();
@@ -678,7 +750,7 @@ function startSession(questionPool){
 
   session = {
     mode: setup.mode,
-    level: setup.level,
+    levelId: setup.levelId,
     count: total,
     pool: questionPool || null,  // 若有預設題庫就用它
     index: 0,
@@ -711,7 +783,7 @@ function nextQuestion(){
   if(session.pool){
     q = session.pool[session.index];
   }else{
-    q = makeQuestion(session.mode, session.level);
+    q = makeQuestion(session.levelId);
   }
   session.current = q;
   session.attempts = 0;
@@ -903,7 +975,7 @@ function finishSession(){
   saveRecord({
     date: new Date().toISOString(),
     mode: session.mode,
-    level: session.level,
+    level: session.levelId,
     count: total,
     accuracy: acc,
     avgTime: Number(avgSec.toFixed(1)),
@@ -975,7 +1047,7 @@ function renderRecords(){
   const keys = Object.keys(levelCount);
   if(keys.length){
     const top = keys.sort((a,b)=>levelCount[b]-levelCount[a])[0];
-    slowType = LEVEL_LABEL[top] || '—';
+    slowType = (LEVEL_INFO[top] && LEVEL_INFO[top].display) || '—';
   }
 
   const lastDate = new Date(last.date);

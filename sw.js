@@ -3,7 +3,7 @@
    策略：有網路時優先抓最新版（所以你更新後一打開就是新版），
         沒網路時才用先前存好的版本。
    改版時把 CACHE 版本號（v2→v3…）加一即可。 */
-const CACHE = 'mpt-v2';
+const CACHE = 'mpt-v3';
 const ASSETS = [
   './', './index.html', './manifest.webmanifest',
   './icon-180.png', './icon-192.png', './icon-512.png', './icon.svg'
